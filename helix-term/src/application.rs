@@ -771,6 +771,7 @@ impl Application {
         }
     }
 
+    #[expect(non_local_definitions)]
     pub async fn handle_language_server_message(
         &mut self,
         call: helix_lsp::Call,
@@ -1139,7 +1140,7 @@ impl Application {
                     Ok(MethodCall::ShowMessageRequest(params)) => {
                         impl ui::menu::Item for lsp::MessageActionItem {
                             type Data = ();
-                            fn format(&self, _data: &Self::Data) -> tui::widgets::Row {
+                            fn format(&self, _data: &Self::Data) -> tui::widgets::Row<'_> {
                                 self.title.as_str().into()
                             }
                         }
