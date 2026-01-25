@@ -440,6 +440,9 @@ impl MappableCommand {
         goto_file, "Goto files/URLs in selections",
         goto_file_hsplit, "Goto files in selections (hsplit)",
         goto_file_vsplit, "Goto files in selections (vsplit)",
+        goto_file_cwd, "Goto files/URLs in selections (relative to working directory)",
+        goto_file_cwd_hsplit, "Goto files in selections (hsplit, relative to working directory)",
+        goto_file_cwd_vsplit, "Goto files in selections (vsplit, relative to working directory)",
         goto_reference, "Goto references",
         goto_window_top, "Goto window top",
         goto_window_center, "Goto window center",
@@ -1316,27 +1319,51 @@ fn goto_file_end_impl(cx: &mut Context, movement: Movement) {
 }
 
 fn goto_file(cx: &mut Context) {
-    goto_file_impl(cx, Action::Replace);
+    goto_file_impl(cx, Action::Replace, GotoFileBase::CurrentFile);
 }
 
 fn goto_file_hsplit(cx: &mut Context) {
-    goto_file_impl(cx, Action::HorizontalSplit);
+    goto_file_impl(cx, Action::HorizontalSplit, GotoFileBase::CurrentFile);
 }
 
 fn goto_file_vsplit(cx: &mut Context) {
-    goto_file_impl(cx, Action::VerticalSplit);
+    goto_file_impl(cx, Action::VerticalSplit, GotoFileBase::CurrentFile);
+}
+
+fn goto_file_cwd(cx: &mut Context) {
+    goto_file_impl(cx, Action::Replace, GotoFileBase::WorkingDirectory);
+}
+
+fn goto_file_cwd_hsplit(cx: &mut Context) {
+    goto_file_impl(cx, Action::HorizontalSplit, GotoFileBase::WorkingDirectory);
+}
+
+fn goto_file_cwd_vsplit(cx: &mut Context) {
+    goto_file_impl(cx, Action::VerticalSplit, GotoFileBase::WorkingDirectory);
+}
+
+/// Base path for resolving relative paths in goto_file commands.
+#[derive(Clone, Copy)]
+enum GotoFileBase {
+    /// Resolve relative to the current file's parent directory.
+    CurrentFile,
+    /// Resolve relative to the editor's working directory.
+    WorkingDirectory,
 }
 
 /// Goto files in selection.
-fn goto_file_impl(cx: &mut Context, action: Action) {
+fn goto_file_impl(cx: &mut Context, action: Action, base: GotoFileBase) {
     let (view, doc) = current_ref!(cx.editor);
     let text = doc.text().slice(..);
     let selections = doc.selection(view.id);
     let primary = selections.primary();
-    let rel_path = doc
-        .relative_path()
-        .map(|path| path.parent().unwrap().to_path_buf())
-        .unwrap_or_default();
+    let rel_path = match base {
+        GotoFileBase::CurrentFile => doc
+            .relative_path()
+            .map(|path| path.parent().unwrap().to_path_buf())
+            .unwrap_or_default(),
+        GotoFileBase::WorkingDirectory => helix_stdx::env::current_working_dir(),
+    };
 
     let paths: Vec<_> = if selections.len() == 1 && primary.len() == 1 {
         // Cap the search at roughly 1k bytes around the cursor.
