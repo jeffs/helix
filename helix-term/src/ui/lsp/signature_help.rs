@@ -11,7 +11,7 @@ use tui::widgets::{BorderType, Paragraph, Widget, Wrap};
 
 use crate::compositor::{Component, Compositor, Context, EventResult};
 
-use crate::alt;
+use crate::ctrl;
 use crate::ui::Markdown;
 
 use crate::ui::Popup;
@@ -78,14 +78,14 @@ impl Component for SignatureHelp {
         }
 
         match event {
-            alt!('p') => {
+            ctrl!('b') => {
                 self.active_signature = self
                     .active_signature
                     .checked_sub(1)
                     .unwrap_or(self.signatures.len() - 1);
                 EventResult::Consumed(None)
             }
-            alt!('n') => {
+            ctrl!('f') => {
                 self.active_signature = (self.active_signature + 1) % self.signatures.len();
                 EventResult::Consumed(None)
             }
