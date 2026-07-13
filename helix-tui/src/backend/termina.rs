@@ -620,6 +620,7 @@ impl Backend for TerminaBackend {
         if !self.capabilities.dynamic_background_color {
             return Ok(());
         }
+        let previous_background_color = self.background_color;
         self.background_color = match color {
             Some(Color::Rgb(r, g, b)) => Some(RgbColor::new(r, g, b)),
             _ => None,
@@ -633,8 +634,14 @@ impl Backend for TerminaBackend {
                     vec![color.into()]
                 )
             )
-        } else {
+        } else if previous_background_color.is_some() {
             self.reset_background_color()
+        } else {
+            // Never emit OSC11 when no color was ever set: `reset_background_color` re-sends
+            // the color queried at startup, which a multiplexer (e.g. Zellij) may have answered
+            // with an opaque or incorrect color, and the exit path skips cleanup when
+            // `background_color` is `None` — leaving the wrong color set permanently.
+            Ok(())
         }
     }
 }
