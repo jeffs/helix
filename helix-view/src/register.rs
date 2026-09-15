@@ -19,8 +19,8 @@ use crate::{
 /// * Selection indices (`#`): index number of each selection starting at 1
 /// * Selection contents (`.`)
 /// * Document path (`%`): filename of the current buffer
-/// * System clipboard (`*`)
-/// * Primary clipboard (`+`)
+/// * Primary clipboard (`*`)
+/// * System clipboard (`+`)
 pub struct Registers {
     /// The mapping of register to values.
     /// Values are stored in reverse order when inserted with `Registers::write`.
