@@ -51,11 +51,26 @@ fn longest_token<'a>(text: &str, comment_tokens: &'a [String]) -> Option<&'a str
 
 /// Re-wrap `text`, every line of which starts with `prefix`, keeping `prefix`
 /// at the start of every output line.
+///
+/// Lines with nothing but whitespace after `prefix` separate paragraphs, which
+/// are re-wrapped independently. Those lines are kept verbatim.
 fn reflow_commented(text: &str, prefix: &str, text_width: usize) -> String {
-    let body: String = text
-        .split_inclusive('\n')
-        .map(|line| &line[prefix.len()..])
-        .collect();
+    let is_blank = |line: &str| line[prefix.len()..].trim().is_empty();
+    let lines: Vec<&str> = text.split_inclusive('\n').collect();
+    let mut reflowed = String::with_capacity(text.len());
+    for chunk in lines.chunk_by(|a, b| is_blank(a) == is_blank(b)) {
+        if is_blank(chunk[0]) {
+            reflowed.extend(chunk.iter().copied());
+        } else {
+            reflowed.push_str(&reflow_paragraph(chunk, prefix, text_width));
+        }
+    }
+    reflowed
+}
+
+/// Re-wrap `lines`, each of which starts with `prefix`, as one paragraph.
+fn reflow_paragraph(lines: &[&str], prefix: &str, text_width: usize) -> String {
+    let body: String = lines.iter().map(|line| &line[prefix.len()..]).collect();
     let width = text_width.saturating_sub(display_width(prefix));
     refill(&body, width)
         .split_inclusive('\n')
@@ -86,6 +101,24 @@ mod tests {
         assert_eq!(
             reflow_hard_wrap(text, 80, &rust_tokens()),
             "/// aaa bbb ccc\n"
+        );
+    }
+
+    #[test]
+    fn blank_comment_lines_separate_paragraphs() {
+        let text = "//! aaa\n//! bbb\n//!\n//!\n//! ccc\n//! ddd";
+        assert_eq!(
+            reflow_hard_wrap(text, 80, &rust_tokens()),
+            "//! aaa bbb\n//!\n//!\n//! ccc ddd"
+        );
+    }
+
+    #[test]
+    fn leading_and_trailing_blank_comment_lines() {
+        let text = "  ///  \n  /// aaa\n  /// bbb\n  ///\n";
+        assert_eq!(
+            reflow_hard_wrap(text, 80, &rust_tokens()),
+            "  ///  \n  /// aaa bbb\n  ///\n"
         );
     }
 
