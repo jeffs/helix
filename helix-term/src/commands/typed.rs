@@ -2483,6 +2483,7 @@ fn reflow(cx: &mut compositor::Context, args: Args, event: PromptEvent) -> anyho
     }
 
     let scrolloff = cx.editor.config().scrolloff;
+    let loader = cx.editor.syn_loader.load();
     let (view, doc) = current!(cx.editor);
 
     // Find the text_width by checking the following sources in order:
@@ -2500,7 +2501,12 @@ fn reflow(cx: &mut compositor::Context, args: Args, event: PromptEvent) -> anyho
     let selection = doc.selection(view.id);
     let transaction = Transaction::change_by_selection(rope, selection, |range| {
         let fragment = range.fragment(rope.slice(..));
-        let reflowed_text = helix_core::wrap::reflow_hard_wrap(&fragment, text_width);
+        let comment_tokens = doc
+            .language_config_at(&loader, rope.char_to_byte(range.from()))
+            .and_then(|config| config.comment_tokens.as_deref())
+            .unwrap_or(&[]);
+        let reflowed_text =
+            helix_core::wrap::reflow_hard_wrap(&fragment, text_width, comment_tokens);
 
         (range.from(), range.to(), Some(reflowed_text))
     });
