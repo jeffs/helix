@@ -81,9 +81,6 @@ pub struct TerminaBackend {
     is_synchronized_output_set: bool,
     /// The requested terminal background color, set in `Self::set_background_color`.
     background_color: Option<RgbColor>,
-    /// The terminal emulator's background color. This is queried when claiming the terminal so
-    /// that custom colors set outside of Helix with OSC11 are restored when Helix exits.
-    original_background_color: Option<RgbColor>,
 }
 
 impl TerminaBackend {
@@ -98,7 +95,6 @@ impl TerminaBackend {
         terminal.enter_raw_mode()?;
 
         let mut capabilities = Capabilities::default();
-        let mut original_background_color = None;
         let start = Instant::now();
 
         // HACK: emitting OSC11 / OSC111 seems to break SGR and cause flickering in tmux.
@@ -120,7 +116,7 @@ impl TerminaBackend {
         // If we only receive the device attributes then we know it is not.
         write!(
             terminal,
-            "{}{}{}{}{}{}{}{}",
+            "{}{}{}{}{}{}{}",
             // Synchronized output
             Csi::Mode(csi::Mode::QueryDecPrivateMode(csi::DecPrivateMode::Code(
                 csi::DecPrivateModeCode::SynchronizedOutput
@@ -133,10 +129,6 @@ impl TerminaBackend {
             Csi::Sgr(csi::Sgr::UnderlineColor(TEST_COLOR.into())),
             Dcs::Request(dcs::DcsRequest::GraphicRendition),
             Csi::Sgr(csi::Sgr::Reset),
-            Osc::ChangeDynamicColors(
-                osc::DynamicColorNumber::TextBackgroundColor,
-                vec![osc::ColorOrQuery::Query]
-            ),
             // Finally request the primary device attributes
             Csi::Device(csi::Device::RequestPrimaryDeviceAttributes),
         )?;
@@ -164,14 +156,6 @@ impl TerminaBackend {
                     }
                     Event::Csi(Csi::Mode(csi::Mode::ReportTheme(mode))) => {
                         capabilities.theme_mode = Some(mode.into());
-                    }
-                    Event::Osc(Osc::ChangeDynamicColors(
-                        osc::DynamicColorNumber::TextBackgroundColor,
-                        colors,
-                    )) => {
-                        if let Some(osc::ColorOrQuery::Color(color)) = colors.first() {
-                            original_background_color = Some(*color);
-                        }
                     }
                     Event::Dcs(dcs::Dcs::Response {
                         value: dcs::DcsResponse::GraphicRendition(sgrs),
@@ -254,7 +238,6 @@ impl TerminaBackend {
             reset_cursor_command,
             is_synchronized_output_set: false,
             background_color: None,
-            original_background_color,
         })
     }
 
@@ -296,13 +279,7 @@ impl TerminaBackend {
         write!(
             self.terminal,
             "{}",
-            match self.original_background_color {
-                Some(color) => Osc::ChangeDynamicColors(
-                    osc::DynamicColorNumber::TextBackgroundColor,
-                    vec![color.into()]
-                ),
-                None => Osc::ResetDynamicColor(osc::DynamicColorNumber::TextBackgroundColor),
-            }
+            Osc::ResetDynamicColor(osc::DynamicColorNumber::TextBackgroundColor)
         )
     }
 
